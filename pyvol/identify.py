@@ -269,10 +269,10 @@ def write_report(all_pockets, **opts):
                           "volume": pocket.mesh.volume,
                           "distance": dist
                           })
-    logger.warning("{0:d} pocket(s)({3:s}) within {1:.1f} A adding up to {2:.2f} A^3".format(number_of_pockets,
-                                                                                             sum_threshold,
-                                                                                             vol,
-                                                                                             names))
+    logger.warning("{0:d} pocket(s) within {1:.1f} A adding up to {2:.2f} A^3 [{3:s}]".format(number_of_pockets,
+                                                                                              sum_threshold,
+                                                                                              vol,
+                                                                                              names))
     rept_df = pd.DataFrame(rept_list)
     rept_name = os.path.join(opts.get("output_dir"), "{0}.rept".format(opts.get("prefix")))
     rept_df.to_csv(rept_name, index=False)
