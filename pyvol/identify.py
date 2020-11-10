@@ -252,6 +252,7 @@ def write_report(all_pockets, **opts):
     rept_list = []
     vol = 0.0
     number_of_pockets = 0
+    names =""
 
     for pocket in all_pockets:
         spheres_name = os.path.join(opts.get("output_dir"), "{0}.xyzrg".format(pocket.name))
@@ -263,12 +264,15 @@ def write_report(all_pockets, **opts):
         if dist < sum_threshold:
             vol += pocket.mesh.volume
             number_of_pockets += 1
+            names += "{:s} ".format(pocket.name)
         rept_list.append({"name": pocket.name,
                           "volume": pocket.mesh.volume,
                           "distance": dist
                           })
-    logger.warning("{0:d} pocket(s) within {1:.1f} A adding up to {2:.2f} A^3".format(number_of_pockets, sum_threshold,
-                                                                                      vol))
+    logger.warning("{0:d} pocket(s)({3:s}) within {1:.1f} A adding up to {2:.2f} A^3".format(number_of_pockets,
+                                                                                             sum_threshold,
+                                                                                             vol,
+                                                                                             names))
     rept_df = pd.DataFrame(rept_list)
     rept_name = os.path.join(opts.get("output_dir"), "{0}.rept".format(opts.get("prefix")))
     rept_df.to_csv(rept_name, index=False)
