@@ -387,6 +387,13 @@ class Spheres(object):
         elif contents == "xyz":
             np.savetxt(filename, self.xyz, delimiter=' ')
             logger.debug("{0} written to xyz file: {1}".format(self.name, filename))
+        elif contents == "xyzH":
+            with open(filename, "w") as fout:
+                fout.write("{:d}\n".format(self.xyz.shape[0]))
+                fout.write("{:s}\n".format(self.name))
+                for p in self.xyz:
+                    fout.write("H{0:10.4f}{1:10.4f}{2:10.4f}\n".format(p[0], p[1], p[2]))
+            logger.debug("{0} written to atomistic xyz file: {1}".format(self.name, filename))
 
         if output_mesh:
             if self.mesh is None:

@@ -10,6 +10,7 @@ import os
 import pandas as pd
 import shutil
 import sys
+import mdtraj as md
 
 logger = logging.getLogger(__name__)
 
@@ -243,16 +244,39 @@ def write_report(all_pockets, **opts):
     import pandas as pd
 
     utilities.check_dir(opts.get("output_dir"))
+    # temporary parameters
+    sele = "protein and (resSeq 261 or resSeq 262 or resSeq 265 or resSeq 284 or resSeq 285 or resSeq 286 or resSeq 287 or resSeq 288 or resSeq 289 or resSeq 290 or resSeq 291 or resSeq 320 or resSeq 404 or resSeq 442 or resSeq 443 or resSeq 537 or resSeq 538 or resSeq 540 or resSeq 567 or resSeq 569)"
+    sum_threshold = 8.0
 
+    ref = get_pocket_centre(opts.get("prot_file"), sele)
     rept_list = []
+    vol = 0.0
+    number_of_pockets = 0
 
     for pocket in all_pockets:
         spheres_name = os.path.join(opts.get("output_dir"), "{0}.xyzrg".format(pocket.name))
+        spheres_xyz = os.path.join(opts.get("output_dir"), "{0}.xyz".format(pocket.name))
         pocket.write(spheres_name)
+        pocket.write(spheres_xyz, contents="xyzH")
+        nearest = pocket.nearest_coord_to_external(ref)
+        dist = np.linalg.norm(ref - nearest)
+        if dist < sum_threshold:
+            vol += pocket.mesh.volume
+            number_of_pockets += 1
         rept_list.append({"name": pocket.name,
-                          "volume": pocket.mesh.volume
+                          "volume": pocket.mesh.volume,
+                          "distance": dist
                           })
+    logger.warning("{0:d} pocket(s) within {1:.1f} A adding up to {2:.2f} A^3".format(number_of_pockets, sum_threshold,
+                                                                                      vol))
     rept_df = pd.DataFrame(rept_list)
     rept_name = os.path.join(opts.get("output_dir"), "{0}.rept".format(opts.get("prefix")))
     rept_df.to_csv(rept_name, index=False)
     logger.info("Report written to: {0}".format(rept_name))
+
+
+def get_pocket_centre(prot_file, selection):
+    pdb = md.load(prot_file)
+    pocket = pdb.atom_slice(pdb.top.select(selection))
+    com = md.compute_center_of_mass(pocket)
+    return 10*com
