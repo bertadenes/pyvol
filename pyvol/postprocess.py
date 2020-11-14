@@ -1,11 +1,12 @@
 import os
+from datetime import datetime
 from glob import glob
 from natsort import natsorted
 import numpy as np
 import pandas as pd
 import argparse
-import matplotlib
 from matplotlib.widgets import Button
+import matplotlib
 matplotlib.use('TkAgg')  # MUST BE CALLED BEFORE IMPORTING plt
 import matplotlib.pyplot as plt
 
@@ -13,6 +14,7 @@ import matplotlib.pyplot as plt
 class ResultsSet:
     def __init__(self, pattern):
         self.cutoff = 8.0
+        self.wrkdr = os.path.dirname(pattern)
         self.folders = natsorted(glob(pattern))
         self.n = len(self.folders)
         self.frames = []
@@ -44,6 +46,9 @@ class ResultsSet:
                 if self.results[j].distance[i] < self.cutoff:
                     self.volumes[j] += self.results[j].volume[i]
                     self.pocket_names[j].append(self.results[j].name[i])
+        for i in range(len(self.volumes)):
+            if self.volumes[i] == 0:
+                self.volumes[i] = float("NaN")
         return
 
     def update(self, event):
@@ -62,7 +67,7 @@ class ResultsSet:
             self.sum_pockets()
         self.figdata.set_ydata(self.volumes)
         self.ax.set_title(self.cutoff)
-        self.ax.set_ylim((0, 1.05*np.max(self.volumes)))
+        self.ax.set_ylim((0, 1.05*np.nanmax(self.volumes)))
         plt.draw()
         return
 
@@ -72,7 +77,7 @@ class ResultsSet:
             self.sum_pockets()
         self.figdata.set_ydata(self.volumes)
         self.ax.set_title(self.cutoff)
-        self.ax.set_ylim((0, 1.05 * np.max(self.volumes)))
+        self.ax.set_ylim((0, 1.05 * np.nanmax(self.volumes)))
         plt.draw()
         return
 
@@ -81,7 +86,7 @@ class ResultsSet:
         plt.rcParams.update({'font.size': 14})
         f, self.ax = plt.subplots()
         self.ax.set_title(self.cutoff)
-        self.ax.set_ylim((0, 1.05 * np.max(self.volumes)))
+        self.ax.set_ylim((0, 1.05 * np.nanmax(self.volumes)))
         self.ax.set_ylabel("Volume / A$^3$")
         self.figdata, = self.ax.plot(np.arange(self.n), self.volumes, "o-")
         self.ax.xaxis.set_visible(False)
@@ -97,16 +102,53 @@ class ResultsSet:
         delattr(self, "ax")
         return
 
-
-class Pocket:
-    def __init__(self, name, volume, distance):
-        self.name = name
-        self.volume = float(volume)
-        self.distance = float(distance)
+    def write_pml(self):
+        """
+        This function is specific to the SARS-CoV-2 helicase visualization
+        """
+        tmpl = "/mnt/data/covid/pyvol/PCA/visualization_template.pse"
+        with open(os.path.join(self.wrkdr, "pyvol_{:%Y%m%d%H%M}.pml".format(datetime.now())), "w") as fout:
+            fout.write("load {:s}\n".format(tmpl))
+            for i in range(self.n):
+                fout.write("load {0:s}, frame{1:03d}\n".format(self.frames[i], i))
+                for j in range(len(self.pocket_names[i])):
+                    fout.write("load {0:s}.xyz\n".format(os.path.join(self.folders[i], self.pocket_names[i][j])))
+                    fout.write("color cyan, {0:s}; hide everything, {0:s}; show surface, {0:s}\n".format(
+                        self.pocket_names[i][j]))
+            fout.write("select domain1, frame* and i. 1-240\n")
+            fout.write("select RecA1, frame* and i. 241-442\n")
+            fout.write("select RecA2, frame* and i. 443-601\n")
+            fout.write("color deepteal, domain1 and elem C\n")
+            fout.write("color yellow, RecA1 and elem C\n")
+            fout.write("color hotpink, RecA2 and elem C\n")
+            fout.write("zoom struct;\n")
+            # fout.write("disable all;\n")
+            fout.write("mset 1x{:d};\n".format(self.n))
+            for i in range(self.n):
+                enable_pockets = ""
+                for j in range(len(self.pocket_names[i])):
+                    enable_pockets += "enable {:s}; ".format(self.pocket_names[i][j])
+                fout.write("disable all; enable struct; enable frame{0:03d}; {1:s}scene s{0:03d}, store;\n".format(
+                    i, enable_pockets))
+                fout.write("mview store, {0:d}, scene=s{0:03d};\n".format(i))
         return
 
-    def __str__(self):
-        return self.name
+    def write_RNA_pml(self):
+        """
+        This function is specific to the SARS-CoV-2 helicase visualization, with the extra assumption, that the
+        largest pocket is the RNA
+        """
+        with open(os.path.join(self.wrkdr, "pyvol_largest_{:%Y%m%d%H%M}.pml".format(datetime.now())), "w") as fout:
+            for i in range(self.n):
+                if self.results[i] is not None:
+                    fout.write("load {0:s}.xyz, largest{1:03d}\n".format(
+                        os.path.join(self.folders[i], self.results[i].name[0]), i))
+            fout.write("hide everything, largest*; show surface, largest*\n")
+            fout.write("zoom struct;\n")
+            for i in range(self.n):
+                fout.write("scene s{0:03d}, recall; enable largest{0:03d}; scene s{0:03d}, update;\n".format(i))
+                fout.write("mview store, {0:d}, scene=s{0:03d};\n".format(i))
+        return
 
 
 def read_out(filename):
@@ -149,4 +191,6 @@ elif args.pattern is not None:
     rs = ResultsSet(args.pattern)
     rs.parse()
     rs.opt_cutoff()
+    rs.write_pml()
+    rs.write_RNA_pml()
 print("")
