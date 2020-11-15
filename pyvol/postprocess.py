@@ -139,7 +139,6 @@ class ResultsSet:
         This function is specific to the SARS-CoV-2 helicase visualization. Resaving movie frames after adjustment.
         """
         with open(os.path.join(self.wrkdr, "pyvol_movie.pml".format(datetime.now())), "w") as fout:
-            fout.write("zoom struct;\n")
             fout.write("mset; rewind\n")
             fout.write("mset 1x{:d};\n".format(self.n))
             for i in range(self.n):
