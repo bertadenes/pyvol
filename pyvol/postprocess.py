@@ -167,6 +167,22 @@ class ResultsSet:
                 fout.write("mview store, {0:d}, scene=s{0:03d};\n".format(i))
         return
 
+    def plot_selected_and_largest(self, fout=None):
+        plt.rcParams.update({'font.size': 14})
+        f, a = plt.subplots()
+        plt.ylabel("Volume / A$^3$")
+        a.xaxis.set_visible(False)
+        a.plot(np.arange(self.n), self.volumes, "o-", label="ATP")
+        largest = [r.volume[0] if r is not None else float("NaN") for r in self.results]
+        a.plot(np.arange(self.n), largest, "o-", label="RNA")
+        plt.legend(loc="best")
+        plt.tight_layout()
+        if fout is None:
+            plt.show()
+        else:
+            plt.savefig(fout, dpi=300)
+        return
+
 
 def read_out(filename):
     volume = []
@@ -199,6 +215,7 @@ def plot_volume(volume, name, fout=None):
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--file")
 parser.add_argument("-p", "--pattern")
+parser.add_argument("--fig")
 args = parser.parse_args()
 if args.file is not None:
     name = args.file.split(os.sep)[-1].split('.')[0]
@@ -208,7 +225,8 @@ elif args.pattern is not None:
     rs = ResultsSet(args.pattern)
     rs.parse()
     rs.opt_cutoff()
-    rs.write_pml()
-    rs.write_RNA_pml()
-    rs.write_vis_pml()
+    # rs.write_pml()
+    # rs.write_RNA_pml()
+    # rs.write_vis_pml()
+    rs.plot_selected_and_largest(args.fig)
 print("")
