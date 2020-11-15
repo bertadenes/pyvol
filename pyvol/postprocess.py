@@ -111,6 +111,7 @@ class ResultsSet:
             fout.write("load {:s}\n".format(tmpl))
             for i in range(self.n):
                 fout.write("load {0:s}, frame{1:03d}\n".format(self.frames[i], i))
+                # fout.write("align frame{:03d}, struct\n".format(i))
                 for j in range(len(self.pocket_names[i])):
                     fout.write("load {0:s}.xyz\n".format(os.path.join(self.folders[i], self.pocket_names[i][j])))
                     fout.write("color cyan, {0:s}; hide everything, {0:s}; show surface, {0:s}\n".format(
@@ -121,8 +122,25 @@ class ResultsSet:
             fout.write("color deepteal, domain1 and elem C\n")
             fout.write("color yellow, RecA1 and elem C\n")
             fout.write("color hotpink, RecA2 and elem C\n")
+            fout.write("align struct, frame000;\n")
             fout.write("zoom struct;\n")
-            # fout.write("disable all;\n")
+            fout.write("mset 1x{:d};\n".format(self.n))
+            for i in range(self.n):
+                enable_pockets = ""
+                for j in range(len(self.pocket_names[i])):
+                    enable_pockets += "enable {:s}; ".format(self.pocket_names[i][j])
+                fout.write("disable all; enable struct; enable frame{0:03d}; {1:s}scene s{0:03d}, store;\n".format(
+                    i, enable_pockets))
+                fout.write("mview store, {0:d}, scene=s{0:03d};\n".format(i))
+        return
+
+    def write_vis_pml(self):
+        """
+        This function is specific to the SARS-CoV-2 helicase visualization. Resaving movie frames after adjustment.
+        """
+        with open(os.path.join(self.wrkdr, "pyvol_movie.pml".format(datetime.now())), "w") as fout:
+            fout.write("zoom struct;\n")
+            fout.write("mset; rewind\n")
             fout.write("mset 1x{:d};\n".format(self.n))
             for i in range(self.n):
                 enable_pockets = ""
@@ -193,4 +211,5 @@ elif args.pattern is not None:
     rs.opt_cutoff()
     rs.write_pml()
     rs.write_RNA_pml()
+    rs.write_vis_pml()
 print("")
