@@ -13,10 +13,11 @@ import matplotlib.pyplot as plt
 
 class ResultsSet:
     def __init__(self, pattern):
-        self.cutoff = 8.0
+        self.cutoff = 3.0
         self.wrkdr = os.path.dirname(pattern)
         self.folders = natsorted(glob(pattern))
         self.n = len(self.folders)
+        self.xval = None
         self.frames = []
         self.results = []
         self.pocket_names = [[] for _ in range(self.n)]
@@ -34,6 +35,10 @@ class ResultsSet:
                 self.results.append(pd.read_csv(summary))
             except IndexError:
                 self.results.append(None)
+            try:
+                self.xval = np.loadtxt(os.path.join(self.wrkdr, "xval.dat"))
+            except IOError:
+                pass
         return
 
     def sum_pockets(self):
@@ -89,7 +94,13 @@ class ResultsSet:
         self.ax.set_ylim((0, 1.05 * np.nanmax(self.volumes)))
         self.ax.set_ylabel("Volume / A$^3$")
         self.figdata, = self.ax.plot(np.arange(self.n), self.volumes, "o-")
-        # self.ax.xaxis.set_visible(False)
+        if self.xval is None:
+            self.ax.xaxis.set_visible(False)
+        else:
+            self.ax.set_xticks([0, 24, 49, 74, 99])
+            self.ax.set_xticklabels(["{:.1f}".format(self.xval[0]), "{:.1f}".format(self.xval[24]),
+                                     "{:.1f}".format(self.xval[49]), "{:.1f}".format(self.xval[74]),
+                                     "{:.1f}".format(self.xval[99])])
         axi = plt.axes([0.60, 0.0, 0.18, 0.07])
         axd = plt.axes([0.78, 0.0, 0.18, 0.07])
         bi = Button(axi, 'Increase')
@@ -167,14 +178,41 @@ class ResultsSet:
                 fout.write("mview store, {0:d}, scene=s{0:03d};\n".format(i))
         return
 
+    def plot_selected(self, fout=None):
+        plt.rcParams.update({'font.size': 14})
+        f, a = plt.subplots()
+        plt.ylabel("Volume / A$^3$")
+        if self.xval is None:
+            a.xaxis.set_visible(False)
+        else:
+            a.set_xticks([0, 24, 49, 74, 99])
+            a.set_xticklabels(["{:.1f}".format(self.xval[0]), "{:.1f}".format(self.xval[24]),
+                               "{:.1f}".format(self.xval[49]), "{:.1f}".format(self.xval[74]),
+                               "{:.1f}".format(self.xval[99])])
+        a.plot(np.arange(self.n), self.volumes, "o-", label="ATP")
+        plt.legend(loc="best")
+        plt.tight_layout()
+        if fout is None:
+            plt.show()
+        else:
+            plt.savefig(fout, dpi=300)
+        return
+
     def plot_selected_and_largest(self, fout=None):
         plt.rcParams.update({'font.size': 14})
         f, a = plt.subplots()
         plt.ylabel("Volume / A$^3$")
-        # a.xaxis.set_visible(False)
+        if self.xval is None:
+            a.xaxis.set_visible(False)
+        else:
+            a.set_xticks([0, 24, 49, 74, 99])
+            a.set_xticklabels(["{:.1f}".format(self.xval[0]), "{:.1f}".format(self.xval[24]),
+                               "{:.1f}".format(self.xval[49]), "{:.1f}".format(self.xval[74]),
+                               "{:.1f}".format(self.xval[99])])
         a.plot(np.arange(self.n), self.volumes, "o-", label="ATP")
         largest = [r.volume[0] if r is not None else float("NaN") for r in self.results]
         a.plot(np.arange(self.n), largest, "o-", label="largest")
+        a.set_ylim([0, np.nanmin([np.nanmax(largest), 3800])+200])
         plt.legend(loc="best")
         plt.tight_layout()
         if fout is None:
@@ -228,5 +266,5 @@ elif args.pattern is not None:
     rs.write_pml()
     rs.write_RNA_pml()
     rs.write_vis_pml()
-    rs.plot_selected_and_largest(args.fig)
+    rs.plot_selected(args.fig)
 print("")
