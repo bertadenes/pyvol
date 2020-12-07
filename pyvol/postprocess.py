@@ -196,6 +196,7 @@ class ResultsSet:
             plt.show()
         else:
             plt.savefig(fout, dpi=300)
+            np.savetxt(fout.replace(".png", ".txt"), self.volumes)
         return
 
     def plot_selected_and_largest(self, fout=None):
@@ -222,44 +223,11 @@ class ResultsSet:
         return
 
 
-def read_out(filename):
-    volume = []
-    pocket = []
-    with open(filename, "r") as fin:
-        for l in fin:
-            try:
-                ll = l.split()
-                volume.append(float(ll[3]))
-                pocket.append([])
-                for i in range(4, len(ll)):
-                    pocket[-1].append(ll[i])
-            except IndexError:
-                pass
-    return np.array(volume), pocket
-
-
-def plot_volume(volume, name, fout=None):
-    plt.rcParams.update({'font.size': 14})
-    f, a = plt.subplots()
-    plt.title(name)
-    plt.ylabel("Volume / A$^3$")
-    a.plot(np.arange(volume.shape[0]), volume, "c-")
-    a.xaxis.set_visible(False)
-    if fout is None:
-        plt.show()
-    return
-
-
 parser = argparse.ArgumentParser()
-parser.add_argument("-f", "--file")
 parser.add_argument("-p", "--pattern")
 parser.add_argument("--fig")
 args = parser.parse_args()
-if args.file is not None:
-    name = args.file.split(os.sep)[-1].split('.')[0]
-    v, p = read_out(args.file)
-    plot_volume(v, name)
-elif args.pattern is not None:
+if args.pattern is not None:
     rs = ResultsSet(args.pattern)
     rs.parse()
     rs.opt_cutoff()
