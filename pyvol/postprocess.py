@@ -26,10 +26,12 @@ class ResultsSet:
         self.frames = []
         self.results = []
         self.pocket_names = [[] for _ in range(self.n)]
-        self.pockets = []
+        self.pocket_legend = []
         self.pocket_IDs = None
         self.volumes = np.zeros(shape=self.n, dtype=np.float_)
+        self.all_volumes = None
         self.ref_sel = []
+        self.n_clusters = None
         return
 
     def save(self, fname="resultset.p"):
@@ -161,10 +163,11 @@ class ResultsSet:
             plt.xlabel("Number of Clusters")
             plt.ylabel("Silhouette Coefficient")
             plt.show()
-        return krange[silhouette_coefficients.index(max(silhouette_coefficients))]
+        self.n_clusters = krange[silhouette_coefficients.index(max(silhouette_coefficients))]
+        return
 
-    def plot_cluster(self, k):
-        km = KMeans(n_clusters=k)
+    def plot_cluster(self):
+        km = KMeans(n_clusters=self.n_clusters)
         km = km.fit(self.pocket_IDs)
         centroids = km.cluster_centers_
         fig = plt.figure()
@@ -192,9 +195,20 @@ class ResultsSet:
     def process(self):
         all = []
         for i in range(self.n):
-            for pid in self.get_pocketID(i):
-                all.append(pid)
+            pid = self.get_pocketID(i)
+            for j in range(pid.shape[0]):
+                all.append(pid[j])
+                self.pocket_legend.append((i, j))
         self.pocket_IDs = np.array(all)
+        return
+
+    def identify(self):
+        self.all_volumes = np.zeros(shape=(self.n, self.n_clusters), dtype=np.float_)
+        km = KMeans(n_clusters=self.n_clusters)
+        km = km.fit(self.pocket_IDs)
+        for i in range(self.pocket_IDs.shape[0]):
+            self.all_volumes[self.pocket_legend[i][0]][km.labels_[i]] =\
+                self.results[self.pocket_legend[i][0]].volume[self.pocket_legend[i][1]]
         return
 
     def write_pml(self):
@@ -311,18 +325,19 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--pattern")
 parser.add_argument("--fig")
 args = parser.parse_args()
-# ref_selection = ["resSeq <= 240", "240 < resSeq <= 445", "445 < resSeq"]
-ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
-                 "300 < resSeq <= 400", "400 < resSeq <= 500", "500 < resSeq"]
+ref_selection = ["resSeq <= 240", "240 < resSeq <= 445", "445 < resSeq"]
+# ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
+#                  "300 < resSeq <= 400", "400 < resSeq <= 500", "500 < resSeq"]
 if args.pattern is not None:
     rs = ResultsSet(args.pattern)
     rs.parse()
     rs.ref_sel = ref_selection
     rs.process()
-    # rs.save()
-    # rs = rs.load()
-    k = rs.opt_cluster(plot=True)
-    rs.cluster(k)
+    rs.opt_cluster()
+    rs.save(fname="resultset.p")
+    # rs = rs.load(fname="resultset.p")
+    rs.identify()
+    # rs.plot_cluster()
     # rs.opt_cutoff()
     # rs.write_pml()
     # rs.write_RNA_pml()
