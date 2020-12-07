@@ -5,7 +5,10 @@ from natsort import natsorted
 import numpy as np
 import pandas as pd
 import argparse
+import pickle
 import mdtraj as md
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 from matplotlib.widgets import Button
 import matplotlib
 matplotlib.use('TkAgg')  # MUST BE CALLED BEFORE IMPORTING plt
@@ -24,9 +27,22 @@ class ResultsSet:
         self.results = []
         self.pocket_names = [[] for _ in range(self.n)]
         self.pockets = []
+        self.pocket_IDs = None
         self.volumes = np.zeros(shape=self.n, dtype=np.float_)
         self.ref_sel = []
         return
+
+    def save(self, fname="resultset.p"):
+        fout = open(fname, "wb")
+        pickle.dump(self, fout)
+        fout.close()
+        return
+
+    def load(self, fname="resultset.p"):
+        fout = open(fname, "rb")
+        loaded = pickle.load(fout)
+        fout.close()
+        return loaded
 
     def parse(self):
         for f in self.folders:
@@ -117,8 +133,46 @@ class ResultsSet:
         delattr(self, "ax")
         return
 
-    def identify(self, ID, index):
+    def opt_cluster(self, krange=range(2, 16), plot=False):
+        # km = KMeans(n_clusters=8).fit(self.pocket_IDs)
+        # https://blog.cambridgespark.com/how-to-determine-the-optimal-number-of-clusters-for-k-means-clustering-14f27070048f
+        Sum_of_squared_distances = []
+        for k in krange:
+            km = KMeans(n_clusters=k)
+            km = km.fit(self.pocket_IDs)
+            Sum_of_squared_distances.append(km.inertia_)
+        if plot:
+            plt.plot(krange, Sum_of_squared_distances, 'bx-')
+            plt.xlabel('Number of clusters')
+            plt.ylabel('Sum of squared distances')
+            plt.show()
+        # https://realpython.com/k-means-clustering-python/#choosing-the-appropriate-number-of-clusters
+        # A list holds the silhouette coefficients for each k
+        silhouette_coefficients = []
+        # Notice you start at 2 clusters for silhouette coefficient
+        for k in krange:
+            kmeans = KMeans(n_clusters=k)
+            kmeans.fit(self.pocket_IDs)
+            score = silhouette_score(self.pocket_IDs, kmeans.labels_)
+            silhouette_coefficients.append(score)
+        if plot:
+            plt.plot(krange, silhouette_coefficients)
+            plt.xticks(krange)
+            plt.xlabel("Number of Clusters")
+            plt.ylabel("Silhouette Coefficient")
+            plt.show()
+        return krange[silhouette_coefficients.index(max(silhouette_coefficients))]
 
+    def plot_cluster(self, k):
+        km = KMeans(n_clusters=k)
+        km = km.fit(self.pocket_IDs)
+        centroids = km.cluster_centers_
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(self.pocket_IDs[:, 0], self.pocket_IDs[:, 1], self.pocket_IDs[:, 2],
+                   c=km.labels_.astype(float), s=50, alpha=0.5)
+        ax.scatter(centroids[:, 0], centroids[:, 1], centroids[:, 2], c='red', s=50)
+        plt.show()
         return
 
     def get_pocketID(self, index):
@@ -136,9 +190,11 @@ class ResultsSet:
         return pocketID
 
     def process(self):
-        for i in [0]:
-            pid = self.get_pocketID(i)
-
+        all = []
+        for i in range(self.n):
+            for pid in self.get_pocketID(i):
+                all.append(pid)
+        self.pocket_IDs = np.array(all)
         return
 
     def write_pml(self):
@@ -255,12 +311,18 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--pattern")
 parser.add_argument("--fig")
 args = parser.parse_args()
-ref_selection = ["resSeq <= 240", "240 < resSeq <= 445", "445 < resSeq"]
+# ref_selection = ["resSeq <= 240", "240 < resSeq <= 445", "445 < resSeq"]
+ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
+                 "300 < resSeq <= 400", "400 < resSeq <= 500", "500 < resSeq"]
 if args.pattern is not None:
     rs = ResultsSet(args.pattern)
     rs.parse()
     rs.ref_sel = ref_selection
-    rs.get_pocketID(0)
+    rs.process()
+    # rs.save()
+    # rs = rs.load()
+    k = rs.opt_cluster(plot=True)
+    rs.cluster(k)
     # rs.opt_cutoff()
     # rs.write_pml()
     # rs.write_RNA_pml()
