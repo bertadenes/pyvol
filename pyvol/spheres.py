@@ -328,8 +328,10 @@ class Spheres(object):
         kdtree = scipy.spatial.cKDTree(self.xyz)
         dist, indices = kdtree.query(coordinates, n_jobs=-1)
 
-        return self.xyz[indices[np.argmin(dist)], :]
-
+        if type(indices) == "list":
+            return self.xyz[indices[np.argmin(dist)], :]
+        else:
+            return self.xyz[indices]
 
     def remove_duplicates(self, eps=0.01):
         """ Remove duplicate spheres by identifying centers closer together than eps using DBSCAN

@@ -5,10 +5,12 @@ from natsort import natsorted
 import numpy as np
 import pandas as pd
 import argparse
+import mdtraj as md
 from matplotlib.widgets import Button
 import matplotlib
 matplotlib.use('TkAgg')  # MUST BE CALLED BEFORE IMPORTING plt
 import matplotlib.pyplot as plt
+from pyvol.spheres import Spheres
 
 
 class ResultsSet:
@@ -21,7 +23,9 @@ class ResultsSet:
         self.frames = []
         self.results = []
         self.pocket_names = [[] for _ in range(self.n)]
+        self.pockets = []
         self.volumes = np.zeros(shape=self.n, dtype=np.float_)
+        self.ref_sel = []
         return
 
     def parse(self):
@@ -111,6 +115,30 @@ class ResultsSet:
         plt.show()
         delattr(self, "figdata")
         delattr(self, "ax")
+        return
+
+    def identify(self, ID, index):
+
+        return
+
+    def get_pocketID(self, index):
+        frame = md.load(self.frames[index])
+        refs = np.empty(shape=(len(self.ref_sel), 3), dtype=np.float_)
+        for i in range(len(self.ref_sel)):
+            refs[i] = md.compute_center_of_mass(frame.atom_slice(frame.top.select(self.ref_sel[i])))
+        refs = 10 * refs
+        pocketID = np.empty(shape=(self.results[index].shape[0], refs.shape[0]))
+        for i in range(self.results[index].shape[0]):
+            p = Spheres(spheres_file="{0:s}.obj".format(os.path.join(self.folders[index], self.results[index].name[i])))
+            for j in range(refs.shape[0]):
+                nearest = p.nearest_coord_to_external(refs[j])
+                pocketID[i][j] = np.linalg.norm(refs[j] - nearest)
+        return pocketID
+
+    def process(self):
+        for i in [0]:
+            pid = self.get_pocketID(i)
+
         return
 
     def write_pml(self):
@@ -227,12 +255,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--pattern")
 parser.add_argument("--fig")
 args = parser.parse_args()
+ref_selection = ["resSeq <= 240", "240 < resSeq <= 445", "445 < resSeq"]
 if args.pattern is not None:
     rs = ResultsSet(args.pattern)
     rs.parse()
-    rs.opt_cutoff()
-    rs.write_pml()
-    rs.write_RNA_pml()
-    rs.write_vis_pml()
-    rs.plot_selected(args.fig)
+    rs.ref_sel = ref_selection
+    rs.get_pocketID(0)
+    # rs.opt_cutoff()
+    # rs.write_pml()
+    # rs.write_RNA_pml()
+    # rs.write_vis_pml()
+    # rs.plot_selected(args.fig)
 print("")
