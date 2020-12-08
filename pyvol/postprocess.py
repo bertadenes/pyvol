@@ -136,6 +136,9 @@ class ResultsSet:
         return
 
     def opt_cluster(self, krange=range(2, 16), plot=False):
+        """
+        Optimises the number of clusters.
+        """
         # km = KMeans(n_clusters=8).fit(self.pocket_IDs)
         # https://blog.cambridgespark.com/how-to-determine-the-optimal-number-of-clusters-for-k-means-clustering-14f27070048f
         Sum_of_squared_distances = []
@@ -167,6 +170,9 @@ class ResultsSet:
         return
 
     def plot_cluster(self):
+        """
+        Plots clustered ID vectors in the first 3 dimensions.
+        """
         km = KMeans(n_clusters=self.n_clusters)
         km = km.fit(self.pocket_IDs)
         centroids = km.cluster_centers_
@@ -179,6 +185,9 @@ class ResultsSet:
         return
 
     def get_pocketID(self, index):
+        """
+        Generates distances to pocket for identification.
+        """
         frame = md.load(self.frames[index])
         refs = np.empty(shape=(len(self.ref_sel), 3), dtype=np.float_)
         for i in range(len(self.ref_sel)):
@@ -193,6 +202,9 @@ class ResultsSet:
         return pocketID
 
     def process(self):
+        """
+        Processed all frames for pocket IDs.
+        """
         all = []
         for i in range(self.n):
             pid = self.get_pocketID(i)
@@ -333,10 +345,10 @@ if args.pattern is not None:
     rs.parse()
     rs.ref_sel = ref_selection
     rs.process()
-    rs.opt_cluster()
+    # rs.opt_cluster()
     rs.save(fname="resultset.p")
     # rs = rs.load(fname="resultset.p")
-    rs.identify()
+    # rs.identify()
     # rs.plot_cluster()
     # rs.opt_cutoff()
     # rs.write_pml()
