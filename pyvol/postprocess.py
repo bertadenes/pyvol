@@ -3,7 +3,7 @@ from datetime import datetime
 from glob import glob
 from natsort import natsorted
 import numpy as np
-from numba import guvectorize, float32
+# from numba import guvectorize, float32
 from scipy.stats.stats import pearsonr
 import pandas as pd
 import argparse
@@ -18,11 +18,11 @@ import matplotlib.pyplot as plt
 from pyvol.spheres import Spheres
 
 
-@guvectorize([(float32[:], float32[:], float32)], '(n),(n)->()')#, nopython=True)
-def dist_v(pid, gp, res):
-    res = np.linalg.norm(pid - gp)
-    print(res)
-    return
+# @guvectorize([(float32[:], float32[:], float32)], '(n),(n)->()')#, nopython=True)
+# def dist_v(pid, gp, res):
+#     res = np.linalg.norm(pid - gp)
+#     print(res)
+#     return
 
 
 def dist(pid, gp):
