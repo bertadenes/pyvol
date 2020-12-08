@@ -3,6 +3,8 @@ from datetime import datetime
 from glob import glob
 from natsort import natsorted
 import numpy as np
+from numba import guvectorize, float32, void
+from scipy.stats.stats import pearsonr
 import pandas as pd
 import argparse
 import pickle
@@ -16,6 +18,17 @@ import matplotlib.pyplot as plt
 from pyvol.spheres import Spheres
 
 
+@guvectorize([(float32[:], float32[:], float32)], '(n),(n)->()')#, nopython=True)
+def dist_v(pid, gp, res):
+    res = np.linalg.norm(pid - gp)
+    print(res)
+    return
+
+
+def dist(pid, gp):
+    return np.linalg.norm(pid - gp)
+
+
 class ResultsSet:
     def __init__(self, pattern):
         self.cutoff = 3.0
@@ -26,7 +39,7 @@ class ResultsSet:
         self.frames = []
         self.results = []
         self.pocket_names = [[] for _ in range(self.n)]
-        self.pocket_legend = []
+        self.pocket_legend = [] # marked for deprecation
         self.pocket_IDs = None
         self.volumes = np.zeros(shape=self.n, dtype=np.float_)
         self.all_volumes = None
@@ -135,6 +148,38 @@ class ResultsSet:
         delattr(self, "ax")
         return
 
+    def get_pocketID(self, index):
+        """
+        Generates distances to pocket for identification.
+        """
+        frame = md.load(self.frames[index])
+        refs = np.empty(shape=(len(self.ref_sel), 3), dtype=np.float_)
+        for i in range(len(self.ref_sel)):
+            refs[i] = md.compute_center_of_mass(frame.atom_slice(frame.top.select(self.ref_sel[i])))
+        refs = 10 * refs
+        pocketID = np.empty(shape=(self.results[index].shape[0], refs.shape[0]), dtype=np.float32)
+        for i in range(self.results[index].shape[0]):
+            p = Spheres(spheres_file="{0:s}.obj".format(os.path.join(self.folders[index], self.results[index].name[i])))
+            for j in range(refs.shape[0]):
+                nearest = p.nearest_coord_to_external(refs[j])
+                pocketID[i][j] = np.linalg.norm(refs[j] - nearest)
+        return pocketID
+
+    def prepare_for_clustering(self):
+        all = []
+        self.n_clusters = 2
+        for i in range(self.n):
+            for pid in self.get_pocketID(i):
+                all.append(pid)
+            pid = self.get_pocketID(i)
+            for j in range(pid.shape[0]):
+                if j == self.n_clusters:
+                    self.n_clusters += 1
+                all.append(pid[j])
+                self.pocket_legend.append((i, j))
+        self.pocket_IDs = np.array(all)
+        return
+
     def opt_cluster(self, krange=range(2, 16), plot=False):
         """
         Optimises the number of clusters.
@@ -184,43 +229,102 @@ class ResultsSet:
         plt.show()
         return
 
-    def get_pocketID(self, index):
-        """
-        Generates distances to pocket for identification.
-        """
-        frame = md.load(self.frames[index])
-        refs = np.empty(shape=(len(self.ref_sel), 3), dtype=np.float_)
-        for i in range(len(self.ref_sel)):
-            refs[i] = md.compute_center_of_mass(frame.atom_slice(frame.top.select(self.ref_sel[i])))
-        refs = 10 * refs
-        pocketID = np.empty(shape=(self.results[index].shape[0], refs.shape[0]))
-        for i in range(self.results[index].shape[0]):
-            p = Spheres(spheres_file="{0:s}.obj".format(os.path.join(self.folders[index], self.results[index].name[i])))
-            for j in range(refs.shape[0]):
-                nearest = p.nearest_coord_to_external(refs[j])
-                pocketID[i][j] = np.linalg.norm(refs[j] - nearest)
-        return pocketID
+    def identify_clusters(self, plot=False):
+        self.all_volumes = np.zeros(shape=(self.n, self.n_clusters), dtype=np.float_)
+        km = KMeans(n_clusters=self.n_clusters)
+        km = km.fit(self.pocket_IDs)
+        for i in range(self.pocket_IDs.shape[0]):
+            self.all_volumes[self.pocket_legend[i][0]][km.labels_[i]] +=\
+                self.results[self.pocket_legend[i][0]].volume[self.pocket_legend[i][1]]
+        self.all_volumes[self.all_volumes == 0] = 'nan'
+        if plot:
+            f, ax = plt.subplots()
+            x = range(self.n)
+            for i in range(self.n_clusters):
+                ax.plot(x, self.all_volumes[:, i], "o-", label="Cluster {:d}".format(i + 1))
+            plt.xlabel("Frame")
+            plt.ylabel("Volume / A$^3$")
+            plt.legend(loc="best")
+            plt.show()
+        return
 
     def process(self):
         """
         Processed all frames for pocket IDs.
         """
+        # how to flatten:
+        # v = p.reshape((1020, 3))
+        # w = v[~np.isnan(v).any(axis=1)]
         all = []
         for i in range(self.n):
-            pid = self.get_pocketID(i)
-            for j in range(pid.shape[0]):
-                all.append(pid[j])
-                self.pocket_legend.append((i, j))
-        self.pocket_IDs = np.array(all)
+            all.append(self.get_pocketID(i))
+        b = np.zeros(shape=(len(all), len(max(all, key=lambda x: len(x))), 3), dtype=np.float_)
+        for i, j in enumerate(all):
+            b[i][0:len(j)] = j
+        b[b == 0] = 'nan'
+        self.pocket_IDs = b
         return
 
-    def identify(self):
-        self.all_volumes = np.zeros(shape=(self.n, self.n_clusters), dtype=np.float_)
-        km = KMeans(n_clusters=self.n_clusters)
-        km = km.fit(self.pocket_IDs)
-        for i in range(self.pocket_IDs.shape[0]):
-            self.all_volumes[self.pocket_legend[i][0]][km.labels_[i]] =\
-                self.results[self.pocket_legend[i][0]].volume[self.pocket_legend[i][1]]
+    def grid(self, bins=10, plot=False, cutoff_factor=0.5, keep_bin_ratio=0.25):
+        all_volumes = []
+        dimensions = self.pocket_IDs.shape[2]
+        boundaries = [np.nanmin(self.pocket_IDs, axis=(0, 1)), np.nanmax(self.pocket_IDs, axis=(0, 1))]
+        lspace = [np.linspace(boundaries[0][i], boundaries[1][i], bins) for i in range(len(boundaries[0]))]
+        mesh = np.array(np.meshgrid(*lspace), dtype=np.float32)
+        cutoff = dist(mesh[:, 0, 0, 0], mesh[:, 1, 1, 1]) * cutoff_factor
+        mesh = mesh.swapaxes(0, dimensions).reshape(bins**dimensions, 3)
+        pockets = []
+        for i in range(mesh.shape[0]):
+            dists = np.empty(shape=(self.n, self.pocket_IDs.shape[1]), dtype=np.float32)
+            for j in range(self.n):
+                for k in range(self.pocket_IDs.shape[1]):
+                    dists[j][k] = dist(self.pocket_IDs[j][k], mesh[i])
+            min_dist = np.nanmin(dists, axis=1)
+            if np.nanmin(min_dist) < cutoff:
+                if len(np.where(min_dist < cutoff)[0]) > keep_bin_ratio*self.n:
+                    print(mesh[i])
+                    idx = np.where(dists < cutoff)
+                    pockets.append(idx)
+                    vol = []
+                    for j in range(self.n):
+                        if j in idx[0]:
+                            k = np.where(idx[0] == j)[0][0]
+                            vol.append(self.results[j].volume[idx[1][k]])
+                        else:
+                            vol.append('nan')
+                    all_volumes.append(vol)
+        all_volumes = np.array(all_volumes, dtype=np.float32)
+        cov = np.zeros(shape=(all_volumes.shape[0], all_volumes.shape[0]))
+        for i in range(all_volumes.shape[0]):
+            for j in range(i):
+                x = all_volumes[i]
+                y = all_volumes[j]
+                bad = ~np.logical_or(np.isnan(x), np.isnan(y))
+                cov[i][j] = pearsonr(np.compress(bad, x), np.compress(bad, y))[0]
+        groups = [0]
+        for i in range(1, all_volumes.shape[0]):
+            for j in range(i):
+                FOUND = False
+                if cov[i][j] > 0.8:
+                    groups.append(groups[j])
+                    FOUND = True
+                    break
+            if not FOUND:
+                groups.append(np.max(groups) + 1)
+        groups = np.array(groups)
+        filtered_volumes = []
+        for i in range(np.max(groups) + 1):
+            filtered_volumes.append(np.nanmean(all_volumes[np.where(groups == i)[0], :], axis=0))
+        filtered_volumes = np.array(filtered_volumes)
+        if plot:
+            f, ax = plt.subplots()
+            x = range(self.n)
+            for i in range(filtered_volumes.shape[0]):
+                ax.plot(x, filtered_volumes[i], "o-", label="Cluster {:d}".format(i + 1))
+            plt.xlabel("Frame")
+            plt.ylabel("Volume / A$^3$")
+            plt.legend(loc="best")
+            plt.show()
         return
 
     def write_pml(self):
@@ -345,11 +449,15 @@ if args.pattern is not None:
     rs.parse()
     rs.ref_sel = ref_selection
     rs.process()
-    # rs.opt_cluster()
-    rs.save(fname="resultset.p")
+    rs.save(fname="ref_domains.p")
     # rs = rs.load(fname="resultset.p")
-    # rs.identify()
+
+    # rs.opt_cluster()
+    # rs.n_clusters = 10
     # rs.plot_cluster()
+    # rs.identify_clusters(plot=True)
+
+    # rs.grid(plot=True)
     # rs.opt_cutoff()
     # rs.write_pml()
     # rs.write_RNA_pml()
