@@ -6,6 +6,7 @@ import numpy as np
 # from numba import guvectorize, float32
 from scipy.stats.stats import pearsonr
 import pandas as pd
+import seaborn as sns
 import argparse
 import pickle
 import mdtraj as md
@@ -44,6 +45,7 @@ class ResultsSet:
         self.volumes = np.zeros(shape=self.n, dtype=np.float_)
         self.all_volumes = None
         self.ref_sel = []
+        self.ref_poc = None
         self.n_clusters = None
         return
 
@@ -74,6 +76,10 @@ class ResultsSet:
                 self.xval = np.loadtxt(os.path.join(self.wrkdr, "xval.dat"))
             except IOError:
                 pass
+        return
+
+    def parse_reference(self, fname):
+        self.ref_poc = pd.read_csv(fname, sep=';', header=None).to_numpy()
         return
 
     def sum_pockets(self):
@@ -442,21 +448,42 @@ class ResultsSet:
             plt.savefig(fout, dpi=300)
         return
 
+    def follow_pocket(self):
+        if self.ref_poc is None:
+            raise ValueError("No pocket is selected to be tracked.")
+        if self.pocket_IDs is None:
+            self.process()
+        for r in self.ref_poc:
+            ref = self.pocket_IDs[r[0]][r[1]]
+            dists = np.empty(shape=(self.n, self.pocket_IDs.shape[1]), dtype=np.float32)
+            for j in range(self.n):
+                for k in range(self.pocket_IDs.shape[1]):
+                    dists[j][k] = dist(self.pocket_IDs[j][k], ref)
+            min_dist = np.nanmin(dists, axis=1)
+            # flat_dist = dists.flatten()
+            sns.displot(min_dist[~np.isnan(min_dist)], kde=True, binwidth=0.5)
+            plt.show()
+        return
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--pattern")
 parser.add_argument("--fig")
+parser.add_argument("-s", "--selected_pockets",
+                    help="Zero based index pairs <WINDOW>;<POCKET> for selecting reference in a file")
 args = parser.parse_args()
 ref_selection = ["resSeq <= 240", "240 < resSeq <= 445", "445 < resSeq"]
 # ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
 #                  "300 < resSeq <= 400", "400 < resSeq <= 500", "500 < resSeq"]
 if args.pattern is not None:
     rs = ResultsSet(args.pattern)
-    rs.parse()
-    rs.ref_sel = ref_selection
-    rs.process()
-    rs.save(fname="ref_domains.p")
-    # rs = rs.load(fname="resultset.p")
+    # rs.parse()
+    # rs.ref_sel = ref_selection
+    # rs.process()
+    # rs.save(fname="ref_domains.p")
+    rs = rs.load(fname="ref_domains.p")
+    rs.parse_reference("/mnt/data/covid/pyvol/EF_rep2/reference_pockets.txt")
+    rs.follow_pocket()
 
     # rs.opt_cluster()
     # rs.n_clusters = 10
