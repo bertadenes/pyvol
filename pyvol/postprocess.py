@@ -3,7 +3,7 @@ from datetime import datetime
 from glob import glob
 from natsort import natsorted
 import numpy as np
-from numba import guvectorize, float32, void
+from numba import guvectorize, float32
 from scipy.stats.stats import pearsonr
 import pandas as pd
 import argparse
@@ -157,13 +157,16 @@ class ResultsSet:
         for i in range(len(self.ref_sel)):
             refs[i] = md.compute_center_of_mass(frame.atom_slice(frame.top.select(self.ref_sel[i])))
         refs = 10 * refs
-        pocketID = np.empty(shape=(self.results[index].shape[0], refs.shape[0]), dtype=np.float32)
-        for i in range(self.results[index].shape[0]):
-            p = Spheres(spheres_file="{0:s}.obj".format(os.path.join(self.folders[index], self.results[index].name[i])))
-            for j in range(refs.shape[0]):
-                nearest = p.nearest_coord_to_external(refs[j])
-                pocketID[i][j] = np.linalg.norm(refs[j] - nearest)
-        return pocketID
+        try:
+            pocketID = np.empty(shape=(self.results[index].shape[0], refs.shape[0]), dtype=np.float32)
+            for i in range(self.results[index].shape[0]):
+                p = Spheres(spheres_file="{0:s}.obj".format(os.path.join(self.folders[index], self.results[index].name[i])))
+                for j in range(refs.shape[0]):
+                    nearest = p.nearest_coord_to_external(refs[j])
+                    pocketID[i][j] = np.linalg.norm(refs[j] - nearest)
+            return pocketID
+        except AttributeError:
+            return []
 
     def prepare_for_clustering(self):
         all = []
@@ -260,7 +263,10 @@ class ResultsSet:
             all.append(self.get_pocketID(i))
         b = np.zeros(shape=(len(all), len(max(all, key=lambda x: len(x))), 3), dtype=np.float_)
         for i, j in enumerate(all):
-            b[i][0:len(j)] = j
+            try:
+                b[i][0:len(j)] = j
+            except ValueError:
+                pass
         b[b == 0] = 'nan'
         self.pocket_IDs = b
         return
