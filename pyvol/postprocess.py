@@ -267,7 +267,7 @@ class ResultsSet:
         all = []
         for i in range(self.n):
             all.append(self.get_pocketID(i))
-        b = np.zeros(shape=(len(all), len(max(all, key=lambda x: len(x))), 3), dtype=np.float_)
+        b = np.zeros(shape=(len(all), len(max(all, key=lambda x: len(x))), len(self.ref_sel)), dtype=np.float32)
         for i, j in enumerate(all):
             try:
                 b[i][0:len(j)] = j
@@ -472,18 +472,18 @@ parser.add_argument("--fig")
 parser.add_argument("-s", "--selected_pockets",
                     help="Zero based index pairs <WINDOW>;<POCKET> for selecting reference in a file")
 args = parser.parse_args()
-ref_selection = ["resSeq <= 240", "240 < resSeq <= 445", "445 < resSeq"]
-# ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
-#                  "300 < resSeq <= 400", "400 < resSeq <= 500", "500 < resSeq"]
+# ref_selection = ["resSeq <= 240", "240 < resSeq <= 445", "445 < resSeq"]
+ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
+                 "300 < resSeq <= 400", "400 < resSeq <= 500", "500 < resSeq"]
 if args.pattern is not None:
     rs = ResultsSet(args.pattern)
-    # rs.parse()
-    # rs.ref_sel = ref_selection
-    # rs.process()
-    # rs.save(fname="ref_domains.p")
-    rs = rs.load(fname="ref_domains.p")
-    rs.parse_reference("/mnt/data/covid/pyvol/EF_rep2/reference_pockets.txt")
-    rs.follow_pocket()
+    rs.parse()
+    rs.ref_sel = ref_selection
+    rs.process()
+    rs.save(fname="ref_6dim.p")
+    # rs = rs.load(fname="ref_6dim.p")
+    # rs.parse_reference("/mnt/data/covid/pyvol/EF_rep2/reference_pockets.txt")
+    # rs.follow_pocket()
 
     # rs.opt_cluster()
     # rs.n_clusters = 10
