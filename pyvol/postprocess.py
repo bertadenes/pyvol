@@ -356,12 +356,12 @@ class ResultsSet:
             plt.show()
         return
 
-    def write_pml(self):
+    def write_pml(self, fname="pyvol"):
         """
         This function is specific to the SARS-CoV-2 helicase visualization
         """
         tmpl = "/mnt/data/covid/pyvol/PCA/visualization_template.pse"
-        with open(os.path.join(self.wrkdr, "pyvol_{:%Y%m%d%H%M}.pml".format(datetime.now())), "w") as fout:
+        with open(os.path.join(self.wrkdr, "{0:s}_{1:%Y%m%d%H%M}.pml".format(fname, datetime.now())), "w") as fout:
             fout.write("load {:s}\n".format(tmpl))
             for i in range(self.n):
                 fout.write("load {0:s}, frame{1:03d}\n".format(self.frames[i], i))
@@ -471,17 +471,40 @@ class ResultsSet:
         if self.pocket_IDs is None:
             self.process()
         for r in self.ref_poc:
-
-            ref = self.pocket_IDs[r[0]][r[1]]
-            dists = np.empty(shape=(self.n, self.pocket_IDs.shape[1]), dtype=np.float32)
+            if identifiers == "all":
+                PIDs = self.pocket_IDs
+            else:
+                PIDs = self.select_ID(r, identifiers)
+            ref = PIDs[r[0]][r[1]]
+            dists = np.empty(shape=(self.n, PIDs.shape[1]), dtype=np.float32)
             for j in range(self.n):
-                for k in range(self.pocket_IDs.shape[1]):
-                    dists[j][k] = dist(self.pocket_IDs[j][k], ref)
+                for k in range(PIDs.shape[1]):
+                    dists[j][k] = dist(PIDs[j][k], ref)
             min_dist = np.nanmin(dists, axis=1)
             # flat_dist = dists.flatten()
             sns.displot(min_dist[~np.isnan(min_dist)], kde=True, binwidth=0.3)
             plt.show()
         return
+
+    def select_ID(self, r, dim, plot=False):
+        refID = self.pocket_IDs[r[0]][r[1]]
+        idx = refID.argsort()[:dim]
+        selected = self.pocket_IDs[:, :, idx]
+        if plot:
+            frame = md.load(self.frames[r[0]])
+            refs = np.empty(shape=(len(self.ref_sel), 3), dtype=np.float32)
+            for i in range(len(self.ref_sel)):
+                if "CA" in self.ref_sel[i]:
+                    refs[i] = frame.xyz[0][frame.top.select(self.ref_sel[i])[0]]
+                else:
+                    refs[i] = md.compute_center_of_mass(frame.atom_slice(frame.top.select(self.ref_sel[i])))
+            refs = 10 * refs
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+            ax.scatter(refs[:, 0], refs[:, 1], refs[:, 2], s=50, alpha=0.5)
+            ax.scatter(refs[idx, 0], refs[idx, 1], refs[idx, 2], c='red', s=50)
+            plt.show()
+        return selected
 
 
 parser = argparse.ArgumentParser()
@@ -497,13 +520,13 @@ ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
                  "300 < resSeq <= 400", "400 < resSeq <= 500", "500 < resSeq"]
 if args.pattern is not None:
     rs = ResultsSet(args.pattern)
-    rs.parse()
     # rs.ref_sel = ref_selection
-    rs.process()
-    rs.save(fname="ref_ca.p")
-    # rs = rs.load(fname="ref_6dim.p")
-    # rs.parse_reference("/mnt/data/covid/pyvol/EF_rep2/reference_pockets.txt")
-    # rs.follow_pocket()
+    # rs.parse()
+    # rs.process()
+    # rs.save(fname="ref_ca.p")
+    rs = rs.load(fname="ref_ca.p")
+    rs.parse_reference("/mnt/data/covid/pyvol/EF_rep2/reference_pockets.txt")
+    rs.follow_pocket()
 
     # rs.opt_cluster()
     # rs.n_clusters = 10
