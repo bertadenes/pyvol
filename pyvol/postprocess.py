@@ -46,7 +46,7 @@ class ResultsSet:
         self.pocket_IDs = None
         self.volumes = np.zeros(shape=self.n, dtype=np.float_)
         self.all_volumes = None
-        self.ref_sel = []
+        self.ref_sel = None
         self.ref_poc = None
         self.n_clusters = None
         return
@@ -269,6 +269,9 @@ class ResultsSet:
         # all = []
         # for i in range(self.n):
         #     all.append(self.get_pocketID(i))
+        if self.ref_sel is None:
+            frame = md.load(self.frames[0])
+            self.ref_sel = ["resid {0:d} to {1:d}".format(i, i + 9) for i in range(0, frame.n_residues, 10)]
         if int(self.n/args.threads) == 0:
             chunk = 1
         else:
@@ -457,12 +460,13 @@ class ResultsSet:
             plt.savefig(fout, dpi=300)
         return
 
-    def follow_pocket(self):
+    def follow_pocket(self, identifiers=6):
         if self.ref_poc is None:
             raise ValueError("No pocket is selected to be tracked.")
         if self.pocket_IDs is None:
             self.process()
         for r in self.ref_poc:
+
             ref = self.pocket_IDs[r[0]][r[1]]
             dists = np.empty(shape=(self.n, self.pocket_IDs.shape[1]), dtype=np.float32)
             for j in range(self.n):
@@ -488,9 +492,9 @@ ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
 if args.pattern is not None:
     rs = ResultsSet(args.pattern)
     rs.parse()
-    rs.ref_sel = ref_selection
+    # rs.ref_sel = ref_selection
     rs.process()
-    rs.save(fname="ref_6dim.p")
+    rs.save()
     # rs = rs.load(fname="ref_6dim.p")
     # rs.parse_reference("/mnt/data/covid/pyvol/EF_rep2/reference_pockets.txt")
     # rs.follow_pocket()
