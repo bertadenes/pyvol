@@ -365,11 +365,13 @@ class ResultsSet:
             fout.write("load {:s}\n".format(tmpl))
             for i in range(self.n):
                 fout.write("load {0:s}, frame{1:03d}\n".format(self.frames[i], i))
-                # fout.write("align frame{:03d}, struct\n".format(i))
+                if i != 0:
+                    fout.write("super frame{:03d}, frame000\n".format(i))
                 for j in range(len(self.pocket_names[i])):
                     fout.write("load {0:s}.xyz\n".format(os.path.join(self.folders[i], self.pocket_names[i][j])))
                     fout.write("color cyan, {0:s}; hide everything, {0:s}; show surface, {0:s}\n".format(
                         self.pocket_names[i][j]))
+                    fout.write("matrix_copy frame{0:03d}, {1:s};\n".format(i, self.pocket_names[i][j]))
             fout.write("select domain1, frame* and i. 1-240\n")
             fout.write("select RecA1, frame* and i. 241-442\n")
             fout.write("select RecA2, frame* and i. 443-601\n")
@@ -388,11 +390,11 @@ class ResultsSet:
                 fout.write("mview store, {0:d}, scene=s{0:03d};\n".format(i))
         return
 
-    def write_vis_pml(self):
+    def write_vis_pml(self, fname="pyvol_movie"):
         """
         This function is specific to the SARS-CoV-2 helicase visualization. Resaving movie frames after adjustment.
         """
-        with open(os.path.join(self.wrkdr, "pyvol_movie.pml".format(datetime.now())), "w") as fout:
+        with open(os.path.join(self.wrkdr, "{:s}.pml".format(fname)), "w") as fout:
             fout.write("mset; rewind\n")
             fout.write("mset 1x{:d};\n".format(self.n))
             for i in range(self.n):
@@ -465,7 +467,7 @@ class ResultsSet:
             plt.savefig(fout, dpi=300)
         return
 
-    def follow_pocket(self, identifiers=6):
+    def follow_pocket(self, identifiers=6, mode="single"):
         if self.ref_poc is None:
             raise ValueError("No pocket is selected to be tracked.")
         if self.pocket_IDs is None:
@@ -480,10 +482,34 @@ class ResultsSet:
             for j in range(self.n):
                 for k in range(PIDs.shape[1]):
                     dists[j][k] = dist(PIDs[j][k], ref)
-            min_dist = np.nanmin(dists, axis=1)
-            # flat_dist = dists.flatten()
-            sns.displot(min_dist[~np.isnan(min_dist)], kde=True, binwidth=0.3)
-            plt.show()
+            if mode == "single":
+                min_dist = np.nanmin(dists, axis=1)
+                sns.displot(min_dist[~np.isnan(min_dist)], kde=True, binwidth=0.3)
+                plt.show()
+            elif mode == "multiple":
+                flat_dist = dists.flatten()
+                sns.displot(flat_dist[~np.isnan(flat_dist)], kde=True, binwidth=0.3)
+                plt.show()
+            while True:
+                ans = input("Please enter a distance cutoff:")
+                try:
+                    cutoff = float(ans)
+                    break
+                except ValueError:
+                    pass
+            # reinitialize selected pockets
+            self.pocket_names = [[] for _ in range(self.n)]
+            if mode == "single":
+                for i in range(self.n):
+                    if min_dist[i] < cutoff:
+                        self.pocket_names[i].append(self.results[i].
+                                                    name[np.where(dists[i] == np.nanmin(dists[i]))[0][0]])
+            elif mode == "multiple":
+                for i in range(self.n):
+                    for j in range(dists.shape[1]):
+                        if dists[i][j] < cutoff: self.pocket_names[i].append(self.results[i].name[j])
+            self.write_pml(fname="pocket_tracking_{0:d}_{1:d}".format(r[0], r[1]))
+            self.write_vis_pml(fname="pocket_vis_{0:d}_{1:d}".format(r[0], r[1]))
         return
 
     def select_ID(self, r, dim, plot=False):
