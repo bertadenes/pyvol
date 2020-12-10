@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime
 from glob import glob
 from multiprocessing import Pool
@@ -163,7 +164,10 @@ class ResultsSet:
         frame = md.load(self.frames[index])
         refs = np.empty(shape=(len(self.ref_sel), 3), dtype=np.float_)
         for i in range(len(self.ref_sel)):
-            refs[i] = md.compute_center_of_mass(frame.atom_slice(frame.top.select(self.ref_sel[i])))
+            if "CA" in self.ref_sel[i]:
+                refs[i] = frame.xyz[0][frame.top.select(self.ref_sel[i])[0]]
+            else:
+                refs[i] = md.compute_center_of_mass(frame.atom_slice(frame.top.select(self.ref_sel[i])))
         refs = 10 * refs
         try:
             pocketID = np.empty(shape=(self.results[index].shape[0], refs.shape[0]), dtype=np.float32)
@@ -271,7 +275,8 @@ class ResultsSet:
         #     all.append(self.get_pocketID(i))
         if self.ref_sel is None:
             frame = md.load(self.frames[0])
-            self.ref_sel = ["resid {0:d} to {1:d}".format(i, i + 9) for i in range(0, frame.n_residues, 10)]
+            # self.ref_sel = ["resid {0:d} to {1:d}".format(i, i + 9) for i in range(0, frame.n_residues, 10)]
+            self.ref_sel = ["resid {0:d} and name CA".format(i) for i in range(0, frame.n_residues, 10)]
         if int(self.n/args.threads) == 0:
             chunk = 1
         else:
@@ -486,6 +491,7 @@ parser.add_argument("-t", "--threads", type=int, default=4)
 parser.add_argument("-s", "--selected_pockets",
                     help="Zero based index pairs <WINDOW>;<POCKET> for selecting reference in a file")
 args = parser.parse_args()
+start = time.time()
 # ref_selection = ["resSeq <= 240", "240 < resSeq <= 445", "445 < resSeq"]
 ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
                  "300 < resSeq <= 400", "400 < resSeq <= 500", "500 < resSeq"]
@@ -494,7 +500,7 @@ if args.pattern is not None:
     rs.parse()
     # rs.ref_sel = ref_selection
     rs.process()
-    rs.save()
+    rs.save(fname="ref_ca.p")
     # rs = rs.load(fname="ref_6dim.p")
     # rs.parse_reference("/mnt/data/covid/pyvol/EF_rep2/reference_pockets.txt")
     # rs.follow_pocket()
@@ -510,4 +516,5 @@ if args.pattern is not None:
     # rs.write_RNA_pml()
     # rs.write_vis_pml()
     # rs.plot_selected(args.fig)
-print("")
+end =time.time()
+print(end - start)
