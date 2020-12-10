@@ -1,6 +1,8 @@
 import os
 from datetime import datetime
 from glob import glob
+from multiprocessing import Pool
+from contextlib import closing
 from natsort import natsorted
 import numpy as np
 # from numba import guvectorize, float32
@@ -264,9 +266,16 @@ class ResultsSet:
         # how to flatten:
         # v = p.reshape((1020, 3))
         # w = v[~np.isnan(v).any(axis=1)]
-        all = []
-        for i in range(self.n):
-            all.append(self.get_pocketID(i))
+        # all = []
+        # for i in range(self.n):
+        #     all.append(self.get_pocketID(i))
+        if int(self.n/args.threads) == 0:
+            chunk = 1
+        else:
+            chunk = int(self.n/args.threads)
+        with closing(Pool(processes=int(args.threads))) as pool:
+            all = pool.map(self.get_pocketID, range(self.n), chunk)
+            pool.terminate()
         b = np.zeros(shape=(len(all), len(max(all, key=lambda x: len(x))), len(self.ref_sel)), dtype=np.float32)
         for i, j in enumerate(all):
             try:
@@ -461,7 +470,7 @@ class ResultsSet:
                     dists[j][k] = dist(self.pocket_IDs[j][k], ref)
             min_dist = np.nanmin(dists, axis=1)
             # flat_dist = dists.flatten()
-            sns.displot(min_dist[~np.isnan(min_dist)], kde=True, binwidth=0.5)
+            sns.displot(min_dist[~np.isnan(min_dist)], kde=True, binwidth=0.3)
             plt.show()
         return
 
@@ -469,6 +478,7 @@ class ResultsSet:
 parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--pattern")
 parser.add_argument("--fig")
+parser.add_argument("-t", "--threads", type=int, default=4)
 parser.add_argument("-s", "--selected_pockets",
                     help="Zero based index pairs <WINDOW>;<POCKET> for selecting reference in a file")
 args = parser.parse_args()
