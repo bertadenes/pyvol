@@ -423,7 +423,7 @@ class ResultsSet:
                 fout.write("mview store, {0:d}, scene=s{0:03d};\n".format(i))
         return
 
-    def plot_selected(self, fout=None):
+    def plot_selected(self, fout=None, label="ATP"):
         plt.rcParams.update({'font.size': 14})
         f, a = plt.subplots()
         plt.ylabel("Volume / A$^3$")
@@ -434,7 +434,7 @@ class ResultsSet:
             a.set_xticklabels(["{:.1f}".format(self.xval[0]), "{:.1f}".format(self.xval[24]),
                                "{:.1f}".format(self.xval[49]), "{:.1f}".format(self.xval[74]),
                                "{:.1f}".format(self.xval[99])])
-        a.plot(np.arange(self.n), self.volumes, "o-", label="ATP")
+        a.plot(np.arange(self.n), self.volumes, "o-", label=label)
         plt.legend(loc="best")
         plt.tight_layout()
         if fout is None:
@@ -476,7 +476,7 @@ class ResultsSet:
             if identifiers == "all":
                 PIDs = self.pocket_IDs
             else:
-                PIDs = self.select_ID(r, identifiers)
+                PIDs = self.select_ID(r, identifiers, plot=False)
             ref = PIDs[r[0]][r[1]]
             dists = np.empty(shape=(self.n, PIDs.shape[1]), dtype=np.float32)
             for j in range(self.n):
@@ -499,17 +499,23 @@ class ResultsSet:
                     pass
             # reinitialize selected pockets
             self.pocket_names = [[] for _ in range(self.n)]
+            self.volumes = np.zeros(shape=self.n, dtype=np.float_)
             if mode == "single":
                 for i in range(self.n):
                     if min_dist[i] < cutoff:
                         self.pocket_names[i].append(self.results[i].
                                                     name[np.where(dists[i] == np.nanmin(dists[i]))[0][0]])
+                        self.volumes[i] = self.results[i].volume[np.where(dists[i] == np.nanmin(dists[i]))[0][0]]
             elif mode == "multiple":
                 for i in range(self.n):
                     for j in range(dists.shape[1]):
-                        if dists[i][j] < cutoff: self.pocket_names[i].append(self.results[i].name[j])
+                        if dists[i][j] < cutoff:
+                            self.pocket_names[i].append(self.results[i].name[j])
+                            self.volumes[i] += self.results[i].volume[j]
             self.write_pml(fname="pocket_tracking_{0:d}_{1:d}".format(r[0], r[1]))
             self.write_vis_pml(fname="pocket_vis_{0:d}_{1:d}".format(r[0], r[1]))
+            self.plot_selected(fout="pocket_vis_{0:d}_{1:d}.png".format(r[0], r[1]),
+                               label="{0:d}_{1:d}".format(r[0], r[1]))
         return
 
     def select_ID(self, r, dim, plot=False):
@@ -552,7 +558,7 @@ if args.pattern is not None:
     # rs.save(fname="ref_ca.p")
     rs = rs.load(fname="ref_ca.p")
     rs.parse_reference("/mnt/data/covid/pyvol/EF_rep2/reference_pockets.txt")
-    rs.follow_pocket()
+    rs.follow_pocket(mode="single")
 
     # rs.opt_cluster()
     # rs.n_clusters = 10
