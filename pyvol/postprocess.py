@@ -502,20 +502,21 @@ class ResultsSet:
             self.volumes = np.zeros(shape=self.n, dtype=np.float_)
             if mode == "single":
                 for i in range(self.n):
-                    if min_dist[i] < cutoff:
+                    if 10000 < min_dist[i] < cutoff:
                         self.pocket_names[i].append(self.results[i].
                                                     name[np.where(dists[i] == np.nanmin(dists[i]))[0][0]])
                         self.volumes[i] = self.results[i].volume[np.where(dists[i] == np.nanmin(dists[i]))[0][0]]
             elif mode == "multiple":
                 for i in range(self.n):
                     for j in range(dists.shape[1]):
-                        if dists[i][j] < cutoff:
+                        if 10000 < dists[i][j] < cutoff:
                             self.pocket_names[i].append(self.results[i].name[j])
                             self.volumes[i] += self.results[i].volume[j]
+            self.volumes = np.where(self.volumes == 0, 199, self.volumes)
             self.write_pml(fname="pocket_tracking_{0:d}_{1:d}".format(r[0], r[1]))
             self.write_vis_pml(fname="pocket_vis_{0:d}_{1:d}".format(r[0], r[1]))
-            self.plot_selected(fout="pocket_vis_{0:d}_{1:d}.png".format(r[0], r[1]),
-                               label="{0:d}_{1:d}".format(r[0], r[1]))
+            self.plot_selected(fout="pocket_{0:d}_{1:d}_{2:.1f}.png".format(r[0], r[1], cutoff),
+                               label="{0:d}_{1:d}_{2:.1f}".format(r[0], r[1], cutoff))
         return
 
     def select_ID(self, r, dim, plot=False):
