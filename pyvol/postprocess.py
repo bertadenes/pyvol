@@ -34,18 +34,22 @@ def dist(pid, gp):
 
 
 class ResultsSet:
-    def __init__(self, pattern):
+    def __init__(self, *args, **kwargs):
         self.cutoff = 3.0
-        self.wrkdr = os.path.dirname(pattern)
-        self.folders = natsorted(glob(pattern))
+        try:
+            self.wrkdr = os.path.dirname(kwargs["pattern"])
+            self.folders = natsorted(glob(kwargs["pattern"]))
+        except KeyError:
+            self.wrkdr = os.curdir
+            self.folders = []
         self.n = len(self.folders)
+        self.pocket_names = [[] for _ in range(self.n)]
+        self.volumes = np.zeros(shape=self.n, dtype=np.float_)
         self.xval = None
         self.frames = []
         self.results = []
-        self.pocket_names = [[] for _ in range(self.n)]
         self.pocket_legend = [] # marked for deprecation
         self.pocket_IDs = None
-        self.volumes = np.zeros(shape=self.n, dtype=np.float_)
         self.all_volumes = None
         self.ref_sel = None
         self.ref_poc = None
@@ -547,6 +551,8 @@ parser.add_argument("--fig")
 parser.add_argument("-t", "--threads", type=int, default=4)
 parser.add_argument("-s", "--selected_pockets",
                     help="Zero based index pairs <WINDOW>;<POCKET> for selecting reference in a file")
+parser.add_argument("-m", "--mode", default="single", help="Pocket tracking mode {single|multiple}")
+parser.add_argument("-l", "--load", help="Processed result-set file, i.e. 'ref_ca.p'")
 args = parser.parse_args()
 start = time.time()
 # ref_selection = ["resSeq <= 240", "240 < resSeq <= 445", "445 < resSeq"]
@@ -554,24 +560,28 @@ ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
                  "300 < resSeq <= 400", "400 < resSeq <= 500", "500 < resSeq"]
 if args.pattern is not None:
     rs = ResultsSet(args.pattern)
-    # rs.ref_sel = ref_selection
-    # rs.parse()
-    # rs.process()
-    # rs.save(fname="ref_ca.p")
-    rs = rs.load(fname="ref_ca.p")
-    rs.parse_reference("/mnt/data/covid/pyvol/EF_rep2/reference_pockets.txt")
-    rs.follow_pocket(mode="single")
+else:
+    rs = ResultsSet()
+# rs.ref_sel = ref_selection
+if args.load is None:
+    rs.parse()
+    rs.process()
+else:
+    rs = rs.load(fname=args.load)
+rs.parse_reference(args.selected_pockets)
+rs.follow_pocket(mode=args.mode)
+# rs.save(fname="ref_ca.p")
 
-    # rs.opt_cluster()
-    # rs.n_clusters = 10
-    # rs.plot_cluster()
-    # rs.identify_clusters(plot=True)
+# rs.opt_cluster()
+# rs.n_clusters = 10
+# rs.plot_cluster()
+# rs.identify_clusters(plot=True)
 
-    # rs.grid(plot=True)
-    # rs.opt_cutoff()
-    # rs.write_pml()
-    # rs.write_RNA_pml()
-    # rs.write_vis_pml()
-    # rs.plot_selected(args.fig)
+# rs.grid(plot=True)
+# rs.opt_cutoff()
+# rs.write_pml()
+# rs.write_RNA_pml()
+# rs.write_vis_pml()
+# rs.plot_selected(args.fig)
 end =time.time()
 print(end - start)
