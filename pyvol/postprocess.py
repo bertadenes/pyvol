@@ -167,6 +167,7 @@ class ResultsSet:
         Generates distances to pocket for identification.
         """
         frame = md.load(self.frames[index])
+        print(self.frames[index])
         refs = np.empty(shape=(len(self.ref_sel), 3), dtype=np.float_)
         for i in range(len(self.ref_sel)):
             if "CA" in self.ref_sel[i]:
