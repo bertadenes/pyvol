@@ -37,7 +37,8 @@ class ResultsSet:
     def __init__(self, *args, **kwargs):
         self.cutoff = 3.0
         try:
-            self.wrkdr = os.path.dirname(kwargs["pattern"])
+            # self.wrkdr = os.path.dirname(kwargs["pattern"])
+            self.wrkdr = os.getcwd()
             self.folders = natsorted(glob(kwargs["pattern"]))
         except KeyError:
             self.wrkdr = os.curdir
@@ -369,26 +370,27 @@ class ResultsSet:
             fout.write("load {:s}\n".format(tmpl))
             for i in range(self.n):
                 fout.write("load {0:s}, frame{1:03d}\n".format(self.frames[i], i))
-                if i != 0:
-                    fout.write("super frame{:03d}, frame000\n".format(i))
+                fout.write("super frame{:03d}, struct\n".format(i))
                 for j in range(len(self.pocket_names[i])):
-                    fout.write("load {0:s}.xyz\n".format(os.path.join(self.folders[i], self.pocket_names[i][j])))
-                    fout.write("color cyan, {0:s}; hide everything, {0:s}; show surface, {0:s}\n".format(
-                        self.pocket_names[i][j]))
-                    fout.write("matrix_copy frame{0:03d}, {1:s};\n".format(i, self.pocket_names[i][j]))
+                    fout.write("load {0:s}.xyz, frame{1:d}p{2:d}\n".format(os.path.join(self.folders[i],
+                                                                                        self.pocket_names[i][j]), i, j))
+                    fout.write(
+                        "color cyan, frame{0:d}p{1:d}; hide everything, frame{0:d}p{1:d}; show surface, frame{0:d}p{1:d}\n".format(
+                            i, j))
+                    fout.write("matrix_copy frame{0:03d}, frame{0:d}p{1:d};\n".format(i, j))
             fout.write("select domain1, frame* and i. 1-240\n")
             fout.write("select RecA1, frame* and i. 241-442\n")
             fout.write("select RecA2, frame* and i. 443-601\n")
             fout.write("color deepteal, domain1 and elem C\n")
             fout.write("color yellow, RecA1 and elem C\n")
             fout.write("color hotpink, RecA2 and elem C\n")
-            fout.write("align struct, frame000;\n")
+            # fout.write("align struct, frame000;\n")
             fout.write("zoom struct;\n")
             fout.write("mset 1x{:d};\n".format(self.n))
             for i in range(self.n):
                 enable_pockets = ""
                 for j in range(len(self.pocket_names[i])):
-                    enable_pockets += "enable {:s}; ".format(self.pocket_names[i][j])
+                    enable_pockets += "enable frame{0:d}p{1:d};".format(i, j)
                 fout.write("disable all; enable struct; enable frame{0:03d}; {1:s}scene s{0:03d}, store;\n".format(
                     i, enable_pockets))
                 fout.write("mview store, {0:d}, scene=s{0:03d};\n".format(i))
@@ -404,7 +406,7 @@ class ResultsSet:
             for i in range(self.n):
                 enable_pockets = ""
                 for j in range(len(self.pocket_names[i])):
-                    enable_pockets += "enable {:s}; ".format(self.pocket_names[i][j])
+                    enable_pockets += "enable frame{0:d}p{1:d};".format(i, j)
                 fout.write("disable all; enable struct; enable frame{0:03d}; {1:s}scene s{0:03d}, store;\n".format(
                     i, enable_pockets))
                 fout.write("mview store, {0:d}, scene=s{0:03d};\n".format(i))
@@ -559,7 +561,7 @@ start = time.time()
 ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
                  "300 < resSeq <= 400", "400 < resSeq <= 500", "500 < resSeq"]
 if args.pattern is not None:
-    rs = ResultsSet(args.pattern)
+    rs = ResultsSet(pattern=args.pattern)
 else:
     rs = ResultsSet()
 # rs.ref_sel = ref_selection
@@ -568,9 +570,9 @@ if args.load is None:
     rs.process()
 else:
     rs = rs.load(fname=args.load)
+rs.save(fname="ref_ca.p")
 rs.parse_reference(args.selected_pockets)
-rs.follow_pocket(mode=args.mode)
-# rs.save(fname="ref_ca.p")
+rs.follow_pocket(mode=args.mode, identifiers='all')
 
 # rs.opt_cluster()
 # rs.n_clusters = 10
