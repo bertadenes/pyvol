@@ -523,7 +523,7 @@ class ResultsSet:
                         if dists[i][j] < cutoff:
                             self.pocket_names[i].append(self.results[i].name[j])
                             self.volumes[i] += self.results[i].volume[j]
-            self.volumes = np.where(self.volumes == 0, 199, self.volumes)
+            # self.volumes = np.where(self.volumes == 0, 199, self.volumes)
             self.volumes = np.where(self.volumes > 10000, np.nan, self.volumes)
             self.write_pml(fname="pocket_tracking_{0:d}_{1:d}".format(r[0], r[1]), stride=stride)
             self.write_vis_pml(fname="pocket_vis_{0:d}_{1:d}".format(r[0], r[1]), stride=stride)
