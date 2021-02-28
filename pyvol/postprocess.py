@@ -394,11 +394,11 @@ class ResultsSet:
                 fout.write("color deepteal, domain1 and elem C\n")
                 fout.write("color yellow, RecA1 and elem C\n")
                 fout.write("color hotpink, RecA2 and elem C\n")
-            fout.write("zoom struct;\n")
+            fout.write("zoom frame*;\n")
             fout.write("mset; rewind\n")
             fout.write("mset 1x{:d};\n".format(int(self.n/stride)))
             k = 0
-            for i in range(0, self.n, stride):
+            for i in range(1, self.n+1, stride):
                 enable_pockets = ""
                 for j in range(len(self.pocket_names[i])):
                     enable_pockets += "enable frame{0:d}p{1:d};".format(i, j)
@@ -487,7 +487,7 @@ class ResultsSet:
             plt.savefig(fout, dpi=300)
         return
 
-    def follow_pocket(self, identifiers=6, mode="single", stride=1):
+    def follow_pocket(self, spec, identifiers=6, mode="single", stride=1):
         if self.ref_poc is None:
             raise ValueError("No pocket is selected to be tracked.")
         if self.pocket_IDs is None:
@@ -534,7 +534,7 @@ class ResultsSet:
                             self.volumes[i] += self.results[i].volume[j]
             # self.volumes = np.where(self.volumes == 0, 199, self.volumes)
             self.volumes = np.where(self.volumes > 10000, np.nan, self.volumes)
-            self.write_pml(fname="pocket_tracking_{0:d}_{1:d}".format(r[0], r[1]), stride=stride)
+            self.write_pml(fname="pocket_tracking_{0:d}_{1:d}".format(r[0], r[1]), stride=stride, spec=spec)
             self.write_vis_pml(fname="pocket_vis_{0:d}_{1:d}".format(r[0], r[1]), stride=stride)
             self.plot_selected(fout="pocket_{0:d}_{1:d}_{2:.1f}.png".format(r[0], r[1], cutoff),
                                label="{0:d}_{1:d}_{2:.1f}".format(r[0], r[1], cutoff))
@@ -568,6 +568,7 @@ parser.add_argument("-t", "--threads", type=int, default=4)
 parser.add_argument("--ps", type=int, default=100, help="Stride for pml printing.")
 parser.add_argument("-s", "--selected_pockets",
                     help="Zero based index pairs <WINDOW>;<POCKET> for selecting reference in a file")
+parser.add_argument("-S", "--specific", default=None, help="Name a predefined topic specification.")
 parser.add_argument("-m", "--mode", default="single", help="Pocket tracking mode {single|multiple}")
 parser.add_argument("-l", "--load", help="Processed result-set file, i.e. 'ref_ca.p'")
 args = parser.parse_args()
@@ -587,7 +588,7 @@ else:
     rs = rs.load(fname=args.load)
 rs.save(fname="ref_ca.p")
 rs.parse_reference(args.selected_pockets)
-rs.follow_pocket(mode=args.mode, identifiers='all', stride=args.ps)
+rs.follow_pocket(args.specific, mode=args.mode, identifiers='all', stride=args.ps)
 
 # rs.opt_cluster()
 # rs.n_clusters = 10
