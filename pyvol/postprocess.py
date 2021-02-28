@@ -565,6 +565,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--pattern")
 parser.add_argument("--fig")
 parser.add_argument("-t", "--threads", type=int, default=4)
+parser.add_argument("--ps", type=int, default=100, help="Stride for pml printing.")
 parser.add_argument("-s", "--selected_pockets",
                     help="Zero based index pairs <WINDOW>;<POCKET> for selecting reference in a file")
 parser.add_argument("-m", "--mode", default="single", help="Pocket tracking mode {single|multiple}")
@@ -586,7 +587,7 @@ else:
     rs = rs.load(fname=args.load)
 rs.save(fname="ref_ca.p")
 rs.parse_reference(args.selected_pockets)
-rs.follow_pocket(mode=args.mode, identifiers='all', stride=100)
+rs.follow_pocket(mode=args.mode, identifiers='all', stride=args.ps)
 
 # rs.opt_cluster()
 # rs.n_clusters = 10
