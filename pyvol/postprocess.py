@@ -282,11 +282,13 @@ class ResultsSet:
         if self.ref_sel is None:
             frame = md.load(self.frames[0])
             # self.ref_sel = ["resid {0:d} to {1:d}".format(i, i + 9) for i in range(0, frame.n_residues, 10)]
-            self.ref_sel = ["resid {0:d} and name CA".format(i) for i in range(0, frame.n_residues, 10)]
+            self.ref_sel = ["resid {0:d} and name CA".format(i) for i in range(2, frame.n_residues, 10)]
         if int(self.n/args.threads) == 0:
             chunk = 1
         else:
             chunk = int(self.n/args.threads)
+        # for i in range(self.n):
+        #     rv = self.get_pocketID(i)
         with closing(Pool(processes=int(args.threads))) as pool:
             all = pool.map(self.get_pocketID, range(self.n), chunk)
             pool.terminate()
@@ -362,16 +364,22 @@ class ResultsSet:
             plt.show()
         return
 
-    def write_pml(self, fname="pyvol", stride=1):
+    def write_pml(self, fname="pyvol", stride=1, spec="helicase"):
         """
-        This function is specific to the SARS-CoV-2 helicase visualization
+        This function was specific to the SARS-CoV-2 helicase visualization.
+        The generalization is underway.
         """
-        tmpl = "/mnt/data/covid/pyvol/PCA/visualization_template.pse"
+        if spec == "helicase":
+            tmpl = "/mnt/data/covid/pyvol/PCA/visualization_template.pse"
         with open(os.path.join(self.wrkdr, "{0:s}_{1:%Y%m%d%H%M}.pml".format(fname, datetime.now())), "w") as fout:
-            fout.write("load {:s}\n".format(tmpl))
+            if spec == "helicase":
+                fout.write("load {:s}\n".format(tmpl))
             for i in range(0, self.n, stride):
                 fout.write("load {0:s}, frame{1:03d}\n".format(self.frames[i], i))
-                fout.write("super frame{:03d}, struct\n".format(i))
+                if spec == "helicase":
+                    fout.write("super frame{:03d}, struct\n".format(i))
+                else:
+                    fout.write("super frame{:03d}, frame001\n".format(i))
                 for j in range(len(self.pocket_names[i])):
                     fout.write("load {0:s}.xyz, frame{1:d}p{2:d}\n".format(os.path.join(self.folders[i],
                                                                                         self.pocket_names[i][j]), i, j))
@@ -379,12 +387,13 @@ class ResultsSet:
                         "color cyan, frame{0:d}p{1:d}; hide everything, frame{0:d}p{1:d}; show surface, frame{0:d}p{1:d}\n".format(
                             i, j))
                     fout.write("matrix_copy frame{0:03d}, frame{0:d}p{1:d};\n".format(i, j))
-            fout.write("select domain1, frame* and i. 1-240\n")
-            fout.write("select RecA1, frame* and i. 241-442\n")
-            fout.write("select RecA2, frame* and i. 443-601\n")
-            fout.write("color deepteal, domain1 and elem C\n")
-            fout.write("color yellow, RecA1 and elem C\n")
-            fout.write("color hotpink, RecA2 and elem C\n")
+            if spec == "helicase":
+                fout.write("select domain1, frame* and i. 1-240\n")
+                fout.write("select RecA1, frame* and i. 241-442\n")
+                fout.write("select RecA2, frame* and i. 443-601\n")
+                fout.write("color deepteal, domain1 and elem C\n")
+                fout.write("color yellow, RecA1 and elem C\n")
+                fout.write("color hotpink, RecA2 and elem C\n")
             fout.write("zoom struct;\n")
             fout.write("mset; rewind\n")
             fout.write("mset 1x{:d};\n".format(int(self.n/stride)))
@@ -563,8 +572,8 @@ parser.add_argument("-l", "--load", help="Processed result-set file, i.e. 'ref_c
 args = parser.parse_args()
 start = time.time()
 # ref_selection = ["resSeq <= 240", "240 < resSeq <= 445", "445 < resSeq"]
-ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
-                 "300 < resSeq <= 400", "400 < resSeq <= 500", "500 < resSeq"]
+# ref_selection = ["resSeq <= 100", "100 < resSeq <= 200", "200 < resSeq <= 300",
+#                  "300 < resSeq <= 400", "400 < resSeq <= 500", "500 < resSeq"]
 if args.pattern is not None:
     rs = ResultsSet(pattern=args.pattern)
 else:
