@@ -398,13 +398,13 @@ class ResultsSet:
             fout.write("mset; rewind\n")
             fout.write("mset 1x{:d};\n".format(int(self.n/stride)))
             k = 0
-            for i in range(1, self.n+1, stride):
+            for i in range(0, self.n, stride):
                 enable_pockets = ""
                 for j in range(len(self.pocket_names[i])):
                     enable_pockets += "enable frame{0:d}p{1:d};".format(i, j)
                 fout.write("disable all; enable struct; enable frame{0:03d}; {1:s}scene s{0:03d}, store;\n".format(
                     i, enable_pockets))
-                fout.write("mview store, {1:d}, scene=s{0:03d};\n".format(i, k))
+                fout.write("mview store, {1:d}, scene=s{0:03d};\n".format(i+1, k))
                 k += 1
         return
 
