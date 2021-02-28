@@ -404,7 +404,7 @@ class ResultsSet:
                     enable_pockets += "enable frame{0:d}p{1:d};".format(i, j)
                 fout.write("disable all; enable struct; enable frame{0:03d}; {1:s}scene s{0:03d}, store;\n".format(
                     i, enable_pockets))
-                fout.write("mview store, {1:d}, scene=s{0:03d};\n".format(i+1, k))
+                fout.write("mview store, {1:d}, scene=s{0:03d};\n".format(i, k-1))
                 k += 1
         return
 
